@@ -357,52 +357,36 @@ PHP;
         }
 
         try {
-            // إنشاء الملف إذا لم يكن موجوداً
-            if (!file_exists($routePath)) {
-                $content = <<<PHP
-<?php
+            $content = file_exists($routePath) ? file_get_contents($routePath) : "<?php\n\n";
 
-{$useRouteStatement}
-{$useControllerStatement}
-
-Route::group(['middleware' => ['auth:api']], function () {
-{$routeCode}
-});
-PHP;
-                $this->files->put($routePath, $content);
-                $this->info("Created routes/api.php with auth:api group");
-                return;
-            }
-
-            $content = file_get_contents($routePath);
-
-            // التحقق مما إذا كانت الروت موجودة بالفعل
-            if (Str::contains($content, "Route::resource('{$routeTableName}', {$modelName}Controller::class)")) {
-                $this->warn("Route for {$routeTableName} already exists in routes/api.php");
-                return;
-            }
-
-            // إضافة use statements إذا لم تكن موجودة
             if (!Str::contains($content, $useRouteStatement)) {
-                $content = str_replace('<?php', "<?php\n\n{$useRouteStatement}", $content);
+                $content = preg_replace('/<\?php/', "<?php\n\n{$useRouteStatement}", $content, 1);
             }
 
             if (!Str::contains($content, $useControllerStatement)) {
-                $content = preg_replace('/<\?php\s+/', "<?php\n{$useControllerStatement}\n", $content);
+                $content = preg_replace('/(<\?php.*?\n)/s', "$1{$useControllerStatement}\n", $content, 1);
             }
 
-            // إضافة الروت داخل مجموعة auth:api
-            if (Str::contains($content, "Route::group(['middleware' => ['auth:api']]")) {
-                // إذا كانت المجموعة موجودة، أضف الروت قبل الـ });
-                $content = preg_replace(
-                    '/(Route::group\(\[\'middleware\' => \[\'auth:api\'\]\], function \(\) \{\n)(.*?)(\n\s*\}\);)/s',
-                    "$1$2{$routeCode}\n$3",
-                    $content
-                );
-            } else {
-                // إذا لم تكن المجموعة موجودة، أنشئها
-                $content .= "\n\nRoute::group(['middleware' => ['auth:api']], function () {\n{$routeCode}\n});";
+            if (!Str::contains($content, "Route::group(['middleware' => ['auth:api']]")) {
+                $content .= "\n\nRoute::group(['middleware' => ['auth:api']], function () {\n});\n";
             }
+
+            $content = preg_replace_callback(
+                '/(Route::group\(\[\'middleware\' => \[\'auth:api\'\]\], function \(\) \{\n)(.*?)(\n\s*\}\);)/s',
+                function ($matches) use ($routeCode) {
+                    $existingRoutes = array_filter(explode("\n", trim($matches[2])));
+                    if (in_array(trim($routeCode), array_map('trim', $existingRoutes))) {
+                        return $matches[0];
+                    }
+
+                    $existingRoutes[] = $routeCode;
+                    sort($existingRoutes);
+                    $newRoutes = implode("\n", $existingRoutes) . "\n";
+
+                    return $matches[1] . $newRoutes . $matches[3];
+                },
+                $content
+            );
 
             $this->files->put($routePath, $content);
             $this->info("Added {$modelName} resource route to auth:api group in routes/api.php");
