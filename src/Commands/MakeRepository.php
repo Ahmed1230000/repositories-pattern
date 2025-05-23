@@ -3,25 +3,16 @@
 namespace Packages\AhmedMahmoud\RepositoryPattern\Commands;
 
 use Illuminate\Console\GeneratorCommand;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
  * Class MakeRepository
- *
- * Artisan command to generate Repository Pattern files
- * with customizable options for model, repository, service,
- * controller, requests, migration, resource, and collection.
- *
- * @package Packages\AhmedMahmoud\RepositoryPattern\Commands
+ * Generates repository pattern structure with customizable options.
  */
 class MakeRepository extends GeneratorCommand
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
     protected $signature = 'make:repo {name : The name of the repository (e.g., Product)}
                             {--a|all : Create all files (model, repository, service, controller, requests, migration, resource, collection)}
                             {--m|model : Create model only}
@@ -30,68 +21,38 @@ class MakeRepository extends GeneratorCommand
                             {--c|controller : Create controller only}
                             {--f|migration : Create migration only}';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
     protected $description = 'Create a new repository pattern structure';
 
-    /**
-     * The type of class being generated.
-     *
-     * @var string
-     */
     protected $type = 'Repository';
 
-    /**
-     * Flag indicating if any files were generated in current run.
-     *
-     * @var bool
-     */
-    protected $filesGenerated = false;
+    protected $filesGenerated = false; // Track if any files were generated
+    protected $allFilesGenerated = true; // Track if all required files were generated
 
-    /**
-     * Flag indicating if all required files were generated.
-     *
-     * @var bool
-     */
-    protected $allFilesGenerated = true;
-
-    /**
-     * Get the stub file for the generator command.
-     *
-     * @return string
-     */
     protected function getStub()
     {
         return __DIR__ . '/../../templates/repository.stub';
     }
 
-    /**
-     * Get the default namespace for the generated repository.
-     *
-     * @param string $rootNamespace
-     * @return string
-     */
     protected function getDefaultNamespace($rootNamespace)
     {
         return $rootNamespace . '\Repositories';
     }
 
-    /**
-     * Execute the console command.
-     *
-     * @return bool|null
-     */
     public function handle()
     {
         if (!$this->checkRequiredFiles()) {
             return false;
         }
 
-        if (!$this->anyOptionSelected()) {
-            $this->displayNoOptionsError();
+        // Check if no options are provided
+        if (
+            !$this->option('all') && !$this->option('model') && !$this->option('repository') &&
+            !$this->option('service') && !$this->option('controller') && !$this->option('migration')
+        ) {
+            $this->error('No options specified for make:repo command.');
+            $this->info('You must specify at least one of the following options:');
+            $this->line('  --all (-a)        Generate all files (model, repository, service, controller, requests, migration, resource, collection)');
+            $this->comment('Example: php artisan make:repo Product --all');
             return false;
         }
 
@@ -108,16 +69,17 @@ class MakeRepository extends GeneratorCommand
             $this->generateSelectedFiles($modelName, $tableName, $lowerName);
         }
 
-        $this->displayGenerationSummary($modelName);
-
-        return null;
+        if ($this->filesGenerated) {
+            if ($this->option('all') && $this->allFilesGenerated) {
+                $this->info("All repository pattern files for {$modelName} have been successfully generated!");
+            } else {
+                $this->info("Repository pattern files for {$modelName} created successfully!");
+            }
+        } else {
+            $this->info("No new files were created for {$modelName} as all files and migration already exist.");
+        }
     }
 
-    /**
-     * Check if required base files exist.
-     *
-     * @return bool
-     */
     protected function checkRequiredFiles()
     {
         $interfacePath = app_path('Contracts/RepositoryInterface.php');
@@ -127,39 +89,9 @@ class MakeRepository extends GeneratorCommand
             $this->error('Required files are missing. Please run: php artisan repository:setup');
             return false;
         }
-
         return true;
     }
 
-    /**
-     * Check if at least one generation option is selected.
-     *
-     * @return bool
-     */
-    protected function anyOptionSelected()
-    {
-        return $this->option('all') || $this->option('model') || $this->option('repository') ||
-            $this->option('service') || $this->option('controller') || $this->option('migration');
-    }
-
-    /**
-     * Display error message when no option is selected.
-     *
-     * @return void
-     */
-    protected function displayNoOptionsError()
-    {
-        $this->error('No options specified for make:repo command.');
-        $this->info('You must specify at least one of the following options:');
-        $this->line('  --all (-a)        Generate all files (model, repository, service, controller, requests, migration, resource, collection)');
-        $this->comment('Example: php artisan make:repo Product --all');
-    }
-
-    /**
-     * Create necessary directories for files.
-     *
-     * @return void
-     */
     protected function createDirectories()
     {
         $directories = [
@@ -183,15 +115,7 @@ class MakeRepository extends GeneratorCommand
         }
     }
 
-    /**
-     * Generate all repository pattern files.
-     *
-     * @param string $modelName
-     * @param string $tableName
-     * @param string $lowerName
-     * @return void
-     */
-    protected function generateAllFiles(string $modelName, string $tableName, string $lowerName)
+    protected function generateAllFiles($modelName, $tableName, $lowerName)
     {
         $files = [
             'model' => app_path("Models/{$modelName}.php"),
@@ -204,13 +128,12 @@ class MakeRepository extends GeneratorCommand
             'collection' => app_path("Http/Resources/{$modelName}Collection.php"),
         ];
 
-        // Determine if migration should be generated
-        $migrationGenerated = true;
+        $migrationGenerated = true; // Track migration separately
+        // Check for existing migration files
         $migrationPath = database_path('migrations');
-        $existingMigrations = glob($migrationPath . "/*_create_{$tableName}_table.php");
-
+        $existingMigrations = glob($migrationPath . '/*_create_' . $tableName . '_table.php');
         if (count($existingMigrations) > 0) {
-            $this->warn("Migration for {$tableName} table skipped because migration file already exists: " . basename($existingMigrations[0]));
+            $this->warn("Migration for {$tableName} table skipped because a migration file already exists: " . basename($existingMigrations[0]));
             $migrationGenerated = false;
         } elseif (Schema::hasTable($tableName)) {
             $this->warn("Migration for {$tableName} table skipped because the table already exists in the database.");
@@ -227,29 +150,26 @@ class MakeRepository extends GeneratorCommand
         ];
 
         foreach ($files as $stub => $path) {
-            if (!$this->generateFile($stub, $path, $replacements) && $stub !== 'migration') {
-                $this->allFilesGenerated = false;
+            if (!$this->generateFile($stub, $path, $replacements)) {
+                // If any file (except migration) fails to generate, mark allFilesGenerated as false
+                if ($stub !== 'migration') {
+                    $this->allFilesGenerated = false;
+                }
             } else {
                 $this->info("Generated {$stub} file: {$path}");
             }
         }
 
-        // Register bindings and add routes if all or some files were generated
-        if ($migrationGenerated && $this->allFilesGenerated) {
-            $this->registerBinding($modelName);
-            $this->addRouteResource($modelName, $tableName);
+        // If migration was skipped but all other files were generated, consider it a success
+        if (!$migrationGenerated && $this->allFilesGenerated) {
+            $this->allFilesGenerated = true;
         }
+
+        $this->registerBinding($modelName);
+        $this->addRouteResource($modelName, $tableName);
     }
 
-    /**
-     * Generate files based on selected options.
-     *
-     * @param string $modelName
-     * @param string $tableName
-     * @param string $lowerName
-     * @return void
-     */
-    protected function generateSelectedFiles(string $modelName, string $tableName, string $lowerName)
+    protected function generateSelectedFiles($modelName, $tableName, $lowerName)
     {
         $generated = false;
         $replacements = [
@@ -259,177 +179,228 @@ class MakeRepository extends GeneratorCommand
             '{{tableName|studly}}' => Str::studly($tableName),
         ];
 
-        // Model generation
         if ($this->option('model')) {
-            $generated |= $this->generateAndLog('model', app_path("Models/{$modelName}.php"), $replacements);
-        }
-
-        // Repository generation
-        if ($this->option('repository')) {
-            $generated |= $this->generateAndLog('repository', app_path("Repositories/{$modelName}Repository.php"), $replacements);
-        }
-
-        // Service & Repository for service or controller options
-        if ($this->option('service') || $this->option('controller')) {
-            $generated |= $this->generateAndLog('repository', app_path("Repositories/{$modelName}Repository.php"), $replacements);
-            $generated |= $this->generateAndLog('service', app_path("Services/{$modelName}Service.php"), $replacements);
-        }
-
-        // Controller, Resource & Collection generation
-        if ($this->option('controller')) {
-            $generated |= $this->generateAndLog('resource', app_path("Http/Resources/{$modelName}Resource.php"), $replacements);
-            $generated |= $this->generateAndLog('collection', app_path("Http/Resources/{$modelName}Collection.php"), $replacements);
-            $generated |= $this->generateAndLog('controller', app_path("Http/Controllers/{$modelName}Controller.php"), $replacements);
-            $this->addRouteResource($modelName, $tableName);
-        }
-
-        // Migration generation
-        if ($this->option('migration')) {
-            $migrationPath = database_path('migrations');
-            $existingMigrations = glob($migrationPath . "/*_create_{$tableName}_table.php");
-            if (count($existingMigrations) > 0) {
-                $this->warn("Migration for {$tableName} table skipped because migration file already exists: " . basename($existingMigrations[0]));
-            } elseif (Schema::hasTable($tableName)) {
-                $this->warn("Migration for {$tableName} table skipped because the table already exists in the database.");
-            } else {
-                $migrationFile = database_path("migrations/" . date('Y_m_d_His') . "_create_{$tableName}_table.php");
-                $generated |= $this->generateAndLog('migration', $migrationFile, $replacements);
+            if ($this->generateFile('model', app_path("Models/{$modelName}.php"), $replacements)) {
+                $generated = true;
+                $this->info("Generated model file: " . app_path("Models/{$modelName}.php"));
             }
         }
 
-        // Register binding if repository was generated
-        if ($generated && ($this->option('repository') || $this->option('service') || $this->option('controller'))) {
+        if ($this->option('repository')) {
+            if ($this->generateFile('repository', app_path("Repositories/{$modelName}Repository.php"), $replacements)) {
+                $generated = true;
+                $this->info("Generated repository file: " . app_path("Repositories/{$modelName}Repository.php"));
+            }
+        }
+
+        if ($this->option('service') || $this->option('controller')) {
+            if ($this->generateFile('repository', app_path("Repositories/{$modelName}Repository.php"), $replacements)) {
+                $generated = true;
+                $this->info("Generated repository file: " . app_path("Repositories/{$modelName}Repository.php"));
+            }
+            if ($this->generateFile('service', app_path("Services/{$modelName}Service.php"), $replacements)) {
+                $generated = true;
+                $this->info("Generated service file: " . app_path("Services/{$modelName}Service.php"));
+            }
+        }
+
+        if ($this->option('controller')) {
+            if ($this->generateFile('resource', app_path("Http/Resources/{$modelName}Resource.php"), $replacements)) {
+                $generated = true;
+                $this->info("Generated resource file: " . app_path("Http/Resources/{$modelName}Resource.php"));
+            }
+            if ($this->generateFile('collection', app_path("Http/Resources/{$modelName}Collection.php"), $replacements)) {
+                $generated = true;
+                $this->info("Generated collection file: " . app_path("Http/Resources/{$modelName}Collection.php"));
+            }
+            if ($this->generateFile('controller', app_path("Http/Controllers/{$modelName}Controller.php"), $replacements)) {
+                $generated = true;
+                $this->info("Generated controller file: " . app_path("Http/Controllers/{$modelName}Controller.php"));
+            }
+            $this->addRouteResource($modelName, $tableName);
+        }
+
+        if ($this->option('migration')) {
+            $migrationPath = database_path('migrations');
+            $existingMigrations = glob($migrationPath . '/*_create_' . $tableName . '_table.php');
+            if (count($existingMigrations) > 0) {
+                $this->warn("Migration for {$tableName} table skipped because a migration file already exists: " . basename($existingMigrations[0]));
+            } elseif (Schema::hasTable($tableName)) {
+                $this->warn("Migration for {$tableName} table skipped because the table already exists in the database.");
+            } else {
+                if ($this->generateFile('migration', database_path("migrations/" . date('Y_m_d_His') . "_create_{$tableName}_table.php"), $replacements)) {
+                    $this->info("Generated migration file for {$tableName} table.");
+                    $generated = true;
+                }
+            }
+        }
+
+        if ($generated && ($this->option('repository') || $this->option('service') || $this->option('controller') || $this->option('all'))) {
             $this->registerBinding($modelName);
         }
+
+        $this->filesGenerated = $generated;
     }
 
-    /**
-     * Helper to generate a file from a stub and output info or warning.
-     *
-     * @param string $stubName
-     * @param string $filePath
-     * @param array $replacements
-     * @return bool True if file generated, false if already exists
-     */
-    protected function generateAndLog(string $stubName, string $filePath, array $replacements): bool
+    protected function generateFile($stubType, $path, $replacements)
     {
-        if ($this->generateFile($stubName, $filePath, $replacements)) {
-            $this->info("Created {$stubName} file at {$filePath}");
-            return true;
-        } else {
-            $this->warn("Skipped existing {$stubName} file: {$filePath}");
+        $stubPath = __DIR__ . "/../../templates/{$stubType}.stub";
+
+        if (!file_exists($stubPath)) {
+            $this->error("Stub file not found: {$stubPath}");
             return false;
         }
-    }
 
-    /**
-     * Generate a single file based on a stub and replacements.
-     *
-     * @param string $stubName
-     * @param string $path
-     * @param array $replacements
-     * @return bool True if file created, false if already exists
-     */
-    protected function generateFile(string $stubName, string $path, array $replacements): bool
-    {
         if (file_exists($path)) {
-            return false; // Skip if file exists
-        }
-
-        $stubFile = __DIR__ . "/../../templates/{$stubName}.stub";
-        if (!file_exists($stubFile)) {
-            $this->error("Stub file not found: {$stubFile}");
+            $this->warn("File {$path} already exists and was not overwritten.");
             return false;
         }
 
-        $content = file_get_contents($stubFile);
-        $content = str_replace(array_keys($replacements), array_values($replacements), $content);
+        $content = file_get_contents($stubPath);
 
-        file_put_contents($path, $content);
+        foreach ($replacements as $search => $replace) {
+            $content = str_replace($search, $replace, $content);
+        }
 
+        if (preg_match('/\{\{.*?\}\}/', $content, $matches)) {
+            $this->error("Unreplaced placeholders found in {$stubType}: " . implode(', ', $matches));
+            return false;
+        }
+
+        $directory = dirname($path);
+        if (!is_dir($directory)) {
+            $this->files->makeDirectory($directory, 0755, true);
+        }
+
+        $this->files->put($path, $content);
+        $this->filesGenerated = true;
         return true;
     }
 
-    /**
-     * Register repository binding in AppServiceProvider.
-     *
-     * @param string $modelName
-     * @return void
-     */
-    protected function registerBinding(string $modelName)
+    protected function registerBinding($modelName)
     {
-        $providerPath = app_path('Providers/AppServiceProvider.php');
+        $providerPath = app_path('Providers/RepositoriesServiceProvider.php');
+        $repositoryClass = "App\\Repositories\\{$modelName}Repository";
+        $serviceClass = "App\\Services\\{$modelName}Service";
+
+        $bindingCode = <<<PHP
+        \$this->app->when(\\{$serviceClass}::class)
+            ->needs(\\App\\Contracts\\RepositoryInterface::class)
+            ->give(\\{$repositoryClass}::class);
+PHP;
 
         if (!file_exists($providerPath)) {
-            $this->warn('AppServiceProvider.php not found. Cannot register repository binding.');
-            return;
-        }
+            $content = <<<PHP
+<?php
 
-        $content = file_get_contents($providerPath);
+namespace App\Providers;
 
-        $bindString = "        \$this->app->bind(\n            \\App\\Contracts\\RepositoryInterface::class,\n            \\App\\Repositories\\{$modelName}Repository::class\n        );";
+use Illuminate\Support\ServiceProvider;
 
-        // Check if already registered
-        if (strpos($content, $bindString) !== false) {
-            $this->info("Repository binding for {$modelName} already registered.");
-            return;
-        }
+class RepositoriesServiceProvider extends ServiceProvider
+{
+    public function register()
+    {
+$bindingCode
+    }
 
-        // Insert binding into the register method of AppServiceProvider
-        $pattern = '/public function register\(\)\s*\{/';
-        if (preg_match($pattern, $content, $matches, PREG_OFFSET_CAPTURE)) {
-            $pos = $matches[0][1] + strlen($matches[0][0]);
-            $content = substr_replace($content, "\n" . $bindString . "\n", $pos, 0);
-            file_put_contents($providerPath, $content);
-            $this->info("Registered repository binding for {$modelName} in AppServiceProvider.");
+    public function boot()
+    {
+        //
+    }
+}
+PHP;
         } else {
-            $this->warn("Could not find register() method in AppServiceProvider to add repository binding.");
+            $content = file_get_contents($providerPath);
+            if (!Str::contains($content, $bindingCode)) {
+                $content = preg_replace(
+                    '/(public\s+function\s+register\s*\(\)\s*\{)([^\}]*?)(\})/s',
+                    "$1$2\n$bindingCode\n$3",
+                    $content,
+                    1
+                );
+            }
+        }
+
+        $this->files->put($providerPath, $content);
+
+        $provider = 'App\\Providers\\RepositoriesServiceProvider::class';
+        $filePath = base_path('bootstrap/providers.php');
+        if (!is_writable($filePath)) {
+            $this->error("Cannot write to {$filePath}. Please manually add {$provider}.");
+            return;
+        }
+        $content = file_get_contents($filePath);
+        if (!Str::contains($content, $provider)) {
+            $content = str_replace('return [', "return [\n    {$provider},", $content);
+            file_put_contents($filePath, $content);
         }
     }
 
-    /**
-     * Add resource route to routes/api.php file.
-     *
-     * @param string $modelName
-     * @param string $tableName
-     * @return void
-     */
-    protected function addRouteResource(string $modelName, string $tableName)
+    protected function addRouteResource($modelName, $tableName)
     {
-        $routesFile = base_path('routes/api.php');
-        if (!file_exists($routesFile)) {
-            $this->warn('routes/api.php file not found. Cannot add resource route.');
+        $routePath = base_path('routes/api.php');
+        $controllerClass = "App\\Http\\Controllers\\{$modelName}Controller";
+        $routeTableName = Str::snake(Str::plural($modelName));
+        $routeCode = "    Route::resource('{$routeTableName}', {$modelName}Controller::class);";
+        $useRouteStatement = "use Illuminate\\Support\\Facades\\Route;";
+        $useControllerStatement = "use {$controllerClass};";
+
+        if (!is_writable($routePath)) {
+            $this->error("Cannot write to {$routePath}. Please manually add the route:");
+            $this->line($useRouteStatement);
+            $this->line($useControllerStatement);
+            $this->line("Route::group(['middleware' => ['auth:api']], function () {");
+            $this->line($routeCode);
+            $this->line("});");
             return;
         }
 
-        $routeLine = "Route::apiResource('{$tableName}', \\App\\Http\\Controllers\\{$modelName}Controller::class);";
+        try {
+            $content = file_exists($routePath) ? file_get_contents($routePath) : "<?php\n\n";
 
-        $routesContent = file_get_contents($routesFile);
+            if (!Str::contains($content, $useRouteStatement)) {
+                $content = preg_replace('/<\?php/', "<?php\n\n{$useRouteStatement}", $content, 1);
+            }
 
-        if (strpos($routesContent, $routeLine) !== false) {
-            $this->info("API resource route for {$modelName} already exists in routes/api.php.");
-            return;
-        }
+            if (!Str::contains($content, $useControllerStatement)) {
+                $content = preg_replace('/(<\?php.*?\n)/s', "$1{$useControllerStatement}\n", $content, 1);
+            }
 
-        // Append the route line at the end of routes/api.php
-        file_put_contents($routesFile, PHP_EOL . $routeLine . PHP_EOL, FILE_APPEND);
+            if (!Str::contains($content, "Route::group(['middleware' => ['auth:api']]")) {
+                $content .= "\n\nRoute::group(['middleware' => ['auth:api']], function () {\n});\n";
+            }
 
-        $this->info("Added API resource route for {$modelName} to routes/api.php.");
-    }
+            // استخدم regex يسمح بوجود أي فراغات أو سطور جديدة داخل الجروب
+            $content = preg_replace_callback(
+                '/(Route::group\(\[\'middleware\' => \[\'auth:api\'\]\], function \(\) \{\s*)(.*?)(\s*\}\);)/s',
+                function ($matches) use ($routeCode) {
+                    $existingRoutes = array_filter(array_map('trim', explode("\n", trim($matches[2]))));
 
-    /**
-     * Display final summary after generation.
-     *
-     * @param string $modelName
-     * @return void
-     */
-    protected function displayGenerationSummary(string $modelName)
-    {
-        if ($this->allFilesGenerated) {
-            $this->info("All files for {$modelName} generated successfully.");
-            $this->info('Remember to run migrations and clear caches if needed.');
-        } else {
-            $this->warn('Some files were skipped because they already exist.');
+                    if (in_array(trim($routeCode), $existingRoutes)) {
+                        return $matches[0]; // الراوت موجود بالفعل
+                    }
+
+                    $existingRoutes[] = trim($routeCode);
+                    sort($existingRoutes);
+
+                    $newRoutes = implode("\n", array_map(function ($line) {
+                        return "    " . $line;
+                    }, $existingRoutes)) . "\n";
+
+                    return $matches[1] . $newRoutes . $matches[3];
+                },
+                $content
+            );
+
+            $this->files->put($routePath, $content);
+            $this->info("Added {$modelName} resource route to auth:api group in routes/api.php");
+        } catch (\Exception $e) {
+            $this->error("Failed to update routes: " . $e->getMessage());
         }
     }
 }
+// End of MakeRepository.php
+// This file is part of the Ahmed Mahmoud Repository Pattern package.
+// It is licensed under the MIT License.
+// For more information, please refer to the LICENSE file in the root directory of this package.
