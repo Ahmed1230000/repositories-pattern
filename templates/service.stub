@@ -5,17 +5,39 @@ namespace App\Services;
 use App\Contracts\RepositoryInterface;
 use Packages\AhmedMahmoud\RepositoryPattern\Src\Helpers\HandleError;
 
+/**
+ * Class {{ModelName}}Service
+ *
+ * Service layer for handling business logic related to {{ModelName}}.
+ * It delegates data operations to the repository and handles exceptions gracefully.
+ *
+ * @package App\Services
+ */
 class {{ModelName}}Service
 {
     use HandleError;
 
+    /**
+     * @var RepositoryInterface
+     */
     protected $repository;
 
+    /**
+     * {{ModelName}}Service constructor.
+     *
+     * @param RepositoryInterface $repository The repository instance to interact with data storage.
+     */
     public function __construct(RepositoryInterface $repository)
     {
         $this->repository = $repository;
     }
 
+    /**
+     * Retrieve a paginated list of all resources.
+     *
+     * @return mixed
+     * @throws \Exception
+     */
     public function index()
     {
         try {
@@ -26,6 +48,13 @@ class {{ModelName}}Service
         }
     }
 
+    /**
+     * Create a new resource with the given data.
+     *
+     * @param array $data The data to create the resource with.
+     * @return mixed
+     * @throws \Exception
+     */
     public function store(array $data)
     {
         try {
@@ -36,6 +65,13 @@ class {{ModelName}}Service
         }
     }
 
+    /**
+     * Retrieve a resource by its ID.
+     *
+     * @param int $id The ID of the resource.
+     * @return mixed
+     * @throws \Exception
+     */
     public function show(int $id)
     {
         try {
@@ -46,6 +82,14 @@ class {{ModelName}}Service
         }
     }
 
+    /**
+     * Update the resource with the given ID using provided data.
+     *
+     * @param int $id The ID of the resource.
+     * @param array $data The data to update the resource with.
+     * @return mixed
+     * @throws \Exception
+     */
     public function update(int $id, array $data)
     {
         try {
@@ -56,6 +100,13 @@ class {{ModelName}}Service
         }
     }
 
+    /**
+     * Delete the resource with the specified ID.
+     *
+     * @param int $id The ID of the resource.
+     * @return mixed
+     * @throws \Exception
+     */
     public function destroy(int $id)
     {
         try {

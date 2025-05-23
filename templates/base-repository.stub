@@ -9,26 +9,58 @@ abstract class BaseRepository implements RepositoryInterface
 {
     protected $model;
 
+    /**
+     * Create a new repository instance.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model  $model
+     * @return void
+     */
     public function __construct(Model $model)
     {
         $this->model = $model;
     }
 
+    /**
+     * Retrieve a paginated list of all records.
+     *
+     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
+     */
     public function index()
     {
         return $this->model->paginate(20);
     }
 
+    /**
+     * Store a newly created record in the database.
+     *
+     * @param  array  $data
+     * @return \Illuminate\Database\Eloquent\Model
+     */
     public function store(array $data)
     {
         return $this->model->create($data);
     }
 
+    /**
+     * Retrieve the specified record by its ID.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Database\Eloquent\Model
+     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException
+     */
     public function show(int $id)
     {
         return $this->model->findOrFail($id);
     }
 
+    /**
+     * Update the specified record in the database.
+     *
+     * @param  int  $id
+     * @param  array  $data
+     * @return \Illuminate\Database\Eloquent\Model
+     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException
+     */
     public function update(int $id, array $data)
     {
         $model = $this->model->findOrFail($id);
@@ -36,6 +68,13 @@ abstract class BaseRepository implements RepositoryInterface
         return $model;
     }
 
+    /**
+     * Delete the specified record from the database.
+     *
+     * @param  int  $id
+     * @return bool
+     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException
+     */
     public function destroy(int $id)
     {
         $model = $this->model->findOrFail($id);

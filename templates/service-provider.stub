@@ -7,8 +7,24 @@ use App\Services\{{ModelName}}Service;
 use AhmedMahmoud\RepositoryPattern\Contracts\RepositoryInterface;
 use Illuminate\Support\ServiceProvider;
 
+/**
+ * Class {{ModelName}}ServiceProvider
+ *
+ * Service provider to bind the {{ModelName}} repository interface
+ * to its concrete implementation for dependency injection in the service.
+ *
+ * @package App\Providers
+ */
 class {{ModelName}}ServiceProvider extends ServiceProvider
 {
+    /**
+     * Register services.
+     *
+     * Binds the {{ModelName}}Repository to the RepositoryInterface
+     * when {{ModelName}}Service is resolved.
+     *
+     * @return void
+     */
     public function register()
     {
         $this->app->when({{ModelName}}Service::class)
@@ -16,6 +32,14 @@ class {{ModelName}}ServiceProvider extends ServiceProvider
             ->give({{ModelName}}Repository::class);
     }
 
+    /**
+     * Bootstrap services.
+     *
+     * This method is used to perform any actions required after all services
+     * are registered.
+     *
+     * @return void
+     */
     public function boot()
     {
         //

@@ -2,36 +2,50 @@
 
 namespace Packages\AhmedMahmoud\RepositoryPattern\Src\Contracts;
 
+/**
+ * Interface RepositoryInterface
+ *
+ * Defines the contract for repository CRUD operations.
+ */
 interface RepositoryInterface
 {
     /**
-     * Summary of index
-     * @return void
+     * Retrieve paginated list of resources.
+     *
+     * @return mixed
      */
     public function index();
+
     /**
-     * Summary of store
+     * Store a newly created resource.
+     *
      * @param array $data
-     * @return void
+     * @return mixed
      */
     public function store(array $data);
+
     /**
-     * Summary of show
+     * Retrieve a single resource by ID.
+     *
      * @param int $id
-     * @return void
+     * @return mixed
      */
     public function show(int $id);
+
     /**
-     * Summary of update
+     * Update a resource by ID.
+     *
      * @param int $id
      * @param array $data
-     * @return void
+     * @return mixed
      */
     public function update(int $id, array $data);
+
     /**
-     * Summary of destroy
+     * Delete a resource by ID.
+     *
      * @param int $id
-     * @return void
+     * @return mixed
      */
     public function destroy(int $id);
 }

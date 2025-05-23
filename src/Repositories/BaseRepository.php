@@ -2,46 +2,70 @@
 
 namespace AhmedMahmoud\RepositoryPattern\Repositories;
 
-use Packages\AhmedMahmoud\RepositoryPattern\src\Contracts\RepositoryInterface;
+use Packages\AhmedMahmoud\RepositoryPattern\Src\Contracts\RepositoryInterface;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Class BaseRepository
+ *
+ * Provides a base implementation of the RepositoryInterface
+ * for common CRUD operations using an Eloquent model.
+ */
 class BaseRepository implements RepositoryInterface
 {
+    /**
+     * @var Model The Eloquent model instance.
+     */
     protected $model;
 
+    /**
+     * BaseRepository constructor.
+     *
+     * @param Model $model The model to operate on.
+     */
     public function __construct(Model $model)
     {
         $this->model = $model;
     }
 
     /**
-     * Summary of index
+     * Retrieve paginated list of models.
+     *
      * @return \Illuminate\Pagination\LengthAwarePaginator
      */
     public function index()
     {
         return $this->model->paginate(20);
     }
+
     /**
-     * Summary of store
+     * Create a new model instance.
+     *
      * @param array $data
+     * @return Model
      */
     public function store(array $data)
     {
         return $this->model->create($data);
     }
+
     /**
-     * Summary of show
+     * Find a model by ID or fail.
+     *
      * @param int $id
+     * @return Model
      */
     public function show(int $id)
     {
         return $this->model->findOrFail($id);
     }
+
     /**
-     * Summary of update
+     * Update a model by ID.
+     *
      * @param int $id
      * @param array $data
+     * @return Model|null
      */
     public function update(int $id, array $data)
     {
@@ -51,9 +75,12 @@ class BaseRepository implements RepositoryInterface
         }
         return $model;
     }
+
     /**
-     * Summary of destroy
+     * Delete a model by ID.
+     *
      * @param int $id
+     * @return Model|null
      */
     public function destroy(int $id)
     {

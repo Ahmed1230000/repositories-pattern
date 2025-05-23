@@ -7,8 +7,18 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
-
-
+/**
+ * Class {{ModelName}}
+ *
+ * Represents the {{ModelName}} model, corresponding to the '{{tableName}}' database table.
+ * This model supports soft deletes and factory functionality.
+ *
+ * @property int $id
+ * @property string $name
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ */
 class {{ModelName}} extends Model
 {
     use SoftDeletes, HasFactory;

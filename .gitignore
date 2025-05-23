@@ -3,6 +3,8 @@
 /.idea
 /.vscode
 /.gitignore
+/core.php
+/core_2_.php
 .env
 .DS_Store
 *.log

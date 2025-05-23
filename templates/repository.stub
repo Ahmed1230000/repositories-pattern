@@ -7,6 +7,12 @@ use App\Repositories\BaseRepository;
 
 class {{ModelName}}Repository extends BaseRepository
 {
+    /**
+     * Create a new repository instance.
+     *
+     * @param  \App\Models\{{ModelName}}  $model
+     * @return void
+     */
     public function __construct({{ModelName}} $model)
     {
         parent::__construct($model);
