@@ -61,3 +61,5 @@ Repository pattern files for Student created successfully!
 
 You can find these bindings in:
 `app/Providers/RepositoriesServiceProvider.php`
+`bootstrap/providers/RepositoriesServiceProvider.php`
+
