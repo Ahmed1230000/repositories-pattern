@@ -342,7 +342,11 @@ PHP;
         $routePath = base_path('routes/api.php');
         $controllerClass = "App\\Http\\Controllers\\{$modelName}Controller";
         $routeTableName = $modelName === 'HR' ? 'h_r_s' : $tableName;
-        $routeCode = "\nRoute::resource('{$routeTableName}', {$modelName}Controller::class);";
+        $routeCode = <<<PHP
+Route::group(['middleware' => ['auth:api']], function () {
+    Route::resource('{$routeTableName}', {$modelName}Controller::class);
+});
+PHP;
         $useRouteStatement = "use Illuminate\Support\Facades\Route;";
         $useControllerStatement = "use {$controllerClass};";
 
@@ -355,53 +359,121 @@ PHP;
         }
 
         try {
-            $content = file_exists($routePath) ? file_get_contents($routePath) : "<?php\n\n$useRouteStatement;\n";
-            $content = preg_replace('/<\?php\s*/', '<?php', $content);
-            $content = preg_replace('/\?>\s*$/', '', $content);
-            $content = trim($content) . "\n";
+            // If file doesn't exist, create a new one with the desired format
+            if (!file_exists($routePath)) {
+                $content = <<<PHP
+<?php
 
+$useRouteStatement
+
+$useControllerStatement
+
+$routeCode
+PHP;
+                $this->files->put($routePath, $content);
+                $this->info("Created routes/api.php with Route::resource for {$routeTableName} inside auth:api group");
+                return;
+            }
+
+            // Read existing file
+            $content = file_get_contents($routePath);
+            $content = trim($content);
+
+            // Split content into lines
             $lines = explode("\n", $content);
             $useStatements = [];
             $routeStatements = [];
             $hasRouteUse = false;
             $hasControllerUse = false;
+            $phpTag = '<?php';
+            $currentBlock = [];
 
+            // Parse lines
             foreach ($lines as $line) {
-                if (trim($line) === '<?php' || empty(trim($line))) {
+                $trimmedLine = trim($line);
+
+                if ($trimmedLine === '<?php') {
+                    $phpTag = $trimmedLine;
                     continue;
                 }
-                if (preg_match('/^use\s+.*;/', trim($line))) {
-                    if (trim($line) === $useRouteStatement) {
+
+                if (empty($trimmedLine)) {
+                    if (!empty($currentBlock)) {
+                        $routeStatements[] = implode("\n", $currentBlock);
+                        $currentBlock = [];
+                    }
+                    continue;
+                }
+
+                if (preg_match('/^use\s+.*;/', $trimmedLine)) {
+                    if ($trimmedLine === $useRouteStatement) {
                         $hasRouteUse = true;
-                    } elseif (trim($line) === $useControllerStatement) {
+                    } elseif ($trimmedLine === $useControllerStatement) {
                         $hasControllerUse = true;
                     } else {
-                        $useStatements[] = $line;
+                        $useStatements[] = $trimmedLine;
                     }
-                } elseif (preg_match('/^Route::/', trim($line))) {
-                    $routeStatements[] = $line;
+                    if (!empty($currentBlock)) {
+                        $routeStatements[] = implode("\n", $currentBlock);
+                        $currentBlock = [];
+                    }
+                } elseif (preg_match('/^Route::/', $trimmedLine)) {
+                    $currentBlock[] = $line;
+                } else {
+                    if (!empty($currentBlock)) {
+                        $currentBlock[] = $line;
+                    }
                 }
             }
 
-            $newContent = ["<?php", ""];
-            $newContent[] = $useRouteStatement . ";";
+            // Add any remaining block
+            if (!empty($currentBlock)) {
+                $routeStatements[] = implode("\n", $currentBlock);
+            }
+
+            // Build new content
+            $newContent = [$phpTag, ""];
+
+            // Add use statements
+            if (!$hasRouteUse) {
+                $newContent[] = $useRouteStatement;
+            }
             if (!$hasControllerUse) {
-                $newContent[] = $useControllerStatement . ";";
+                $newContent[] = $useControllerStatement;
             }
             foreach ($useStatements as $use) {
-                $newContent[] = $use;
+                if ($use !== $useRouteStatement && $use !== $useControllerStatement) {
+                    $newContent[] = $use;
+                }
             }
+
+            // Add blank line before routes
             $newContent[] = "";
+
+            // Add existing route statements
             foreach ($routeStatements as $route) {
-                $newContent[] = $route;
+                if (!empty(trim($route))) {
+                    $newContent[] = $route;
+                }
             }
-            if (!in_array(trim($routeCode), array_map('trim', $routeStatements))) {
-                $newContent[] = trim($routeCode);
-                $this->info("Added Route::resource for {$routeTableName} to routes/api.php");
+
+            // Add new route if not present
+            $routeExists = false;
+            foreach ($routeStatements as $route) {
+                if (Str::contains($route, "Route::resource('{$routeTableName}', {$modelName}Controller::class)")) {
+                    $routeExists = true;
+                    break;
+                }
+            }
+
+            if (!$routeExists) {
+                $newContent[] = $routeCode;
+                $this->info("Added Route::resource for {$routeTableName} inside auth:api group to routes/api.php");
             } else {
                 $this->warn("Route::resource for {$routeTableName} already exists in routes/api.php");
             }
 
+            // Write new content
             $this->files->put($routePath, implode("\n", $newContent) . "\n");
         } catch (\Exception $e) {
             Log::error("Failed to update routes/api.php: {$e->getMessage()}");
