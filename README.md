@@ -32,8 +32,20 @@ php artisan repository:setup
 php artisan make:repo {name : The name of the repository} --all (Includes: Model, Repository, Service, Controller, Form Requests, Migration}
 ```
 
-## Service Provider:
+## 🧩 Dependency Injection Binding
 
+The package automatically registers repository bindings in the service container:
+
+```php
 $this->app->when(ProductService::class)
     ->needs(RepositoryInterface::class)
     ->give(ProductRepository::class);
+```
+
+### How it works:
+1. **when()**: Specifies the service class that needs dependency
+2. **needs()**: Defines the interface/abstract type needed
+3. **give()**: Provides the concrete implementation
+
+You can find these bindings in:
+`app/Providers/RepositoriesServiceProvider.php`
