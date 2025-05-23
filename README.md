@@ -1,5 +1,5 @@
 # Laravel Repository Pattern Generator
-
+This 'Package' support only api
 A powerful package to automatically generate the complete repository pattern structure for your Laravel applications.
 
 ## Features
@@ -40,6 +40,18 @@ The package automatically registers repository bindings in the service container
 $this->app->when(ProductService::class)
     ->needs(RepositoryInterface::class)
     ->give(ProductRepository::class);
+```
+## if you not install api this return in your terminal
+out when installed api then try this command again
+```bash
+php artisan make:repo student --all
+Created migration file for students table.
+Cannot write to C:\xampp_new\htdocs\first_package\routes/api.php. Please manually add the following to routes/api.php:
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\StudentController;
+
+Route::resource('students', StudentController::class);
+Repository pattern files for Student created successfully!
 ```
 
 ### How it works:
