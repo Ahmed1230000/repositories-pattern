@@ -1,0 +1,23 @@
+<?php
+
+namespace App\Providers;
+
+use App\Repositories\{{ModelName}}Repository;
+use App\Services\{{ModelName}}Service;
+use AhmedMahmoud\RepositoryPattern\Contracts\RepositoryInterface;
+use Illuminate\Support\ServiceProvider;
+
+class {{ModelName}}ServiceProvider extends ServiceProvider
+{
+    public function register()
+    {
+        $this->app->when({{ModelName}}Service::class)
+            ->needs(RepositoryInterface::class)
+            ->give({{ModelName}}Repository::class);
+    }
+
+    public function boot()
+    {
+        //
+    }
+}

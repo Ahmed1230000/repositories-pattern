@@ -1,0 +1,78 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Services\{{ModelName}}Service;
+use App\Http\Requests\{{ModelName}}StoreFormRequest;
+use App\Http\Requests\{{ModelName}}UpdateFormRequest;
+use App\Http\Resources\{{ModelName}}Resource;
+use App\Http\Resources\{{ModelName}}Collection;
+use Packages\AhmedMahmoud\RepositoryPattern\Src\Helpers\ApiResponse;
+use Packages\AhmedMahmoud\RepositoryPattern\Src\Helpers\HandleError;
+
+class {{ModelName}}Controller extends Controller
+{
+    use ApiResponse, HandleError;
+
+    protected ${{modelName}}Service;
+
+    public function __construct({{ModelName}}Service ${{modelName}}Service)
+    {
+        $this->{{modelName}}Service = ${{modelName}}Service;
+    }
+
+    public function index()
+    {
+        try {
+            $data = $this->{{modelName}}Service->index();
+            return $this->success(new {{ModelName}}Collection($data), 'Data retrieved successfully');
+        } catch (\Exception $e) {
+            $this->handleError('Failed to retrieve data', ['error' => $e->getMessage()]);
+            return $this->error('Failed to retrieve data', 500);
+        }
+    }
+
+    public function store({{ModelName}}StoreFormRequest $request)
+    {
+        try {
+            $data = $this->{{modelName}}Service->store($request->validated());
+            return $this->success({{ModelName}}Resource::make($data), 'Resource created successfully', 201);
+        } catch (\Exception $e) {
+            $this->handleError('Failed to create resource', ['error' => $e->getMessage()]);
+            return $this->error('Failed to create resource', 500);
+        }
+    }
+
+    public function show($id)
+    {
+        try {
+            $data = $this->{{modelName}}Service->show($id);
+            return $this->success({{ModelName}}Resource::make($data), 'Resource retrieved successfully');
+        } catch (\Exception $e) {
+            $this->handleError('Failed to retrieve resource', ['error' => $e->getMessage()]);
+            return $this->error('Failed to retrieve resource', 500);
+        }
+    }
+
+    public function update({{ModelName}}UpdateFormRequest $request, $id)
+    {
+        try {
+            $data = $this->{{modelName}}Service->update($id, $request->validated());
+            return $this->success({{ModelName}}Resource::make($data), 'Resource updated successfully');
+        } catch (\Exception $e) {
+            $this->handleError('Failed to update resource', ['error' => $e->getMessage()]);
+            return $this->error('Failed to update resource', 500);
+        }
+    }
+
+    public function destroy($id)
+    {
+        try {
+            $this->{{modelName}}Service->destroy($id);
+            return $this->success(null, 'Resource deleted successfully', 204);
+        } catch (\Exception $e) {
+            $this->handleError('Failed to delete resource', ['error' => $e->getMessage()]);
+            return $this->error('Failed to delete resource', 500);
+        }
+    }
+}

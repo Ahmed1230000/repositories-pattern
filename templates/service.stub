@@ -1,0 +1,68 @@
+<?php
+
+namespace App\Services;
+
+use App\Contracts\RepositoryInterface;
+use Packages\AhmedMahmoud\RepositoryPattern\Src\Helpers\HandleError;
+
+class {{ModelName}}Service
+{
+    use HandleError;
+
+    protected $repository;
+
+    public function __construct(RepositoryInterface $repository)
+    {
+        $this->repository = $repository;
+    }
+
+    public function index()
+    {
+        try {
+            return $this->repository->index();
+        } catch (\Exception $e) {
+            $this->handleError('Failed to retrieve data', ['error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+
+    public function store(array $data)
+    {
+        try {
+            return $this->repository->store($data);
+        } catch (\Exception $e) {
+            $this->handleError('Failed to create resource', ['error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+
+    public function show(int $id)
+    {
+        try {
+            return $this->repository->show($id);
+        } catch (\Exception $e) {
+            $this->handleError('Failed to retrieve resource', ['error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+
+    public function update(int $id, array $data)
+    {
+        try {
+            return $this->repository->update($id, $data);
+        } catch (\Exception $e) {
+            $this->handleError('Failed to update resource', ['error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+
+    public function destroy(int $id)
+    {
+        try {
+            return $this->repository->destroy($id);
+        } catch (\Exception $e) {
+            $this->handleError('Failed to delete resource', ['error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+}

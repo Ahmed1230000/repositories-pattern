@@ -1,0 +1,45 @@
+<?php
+
+namespace App\Repositories;
+
+use App\Contracts\RepositoryInterface;
+use Illuminate\Database\Eloquent\Model;
+
+abstract class BaseRepository implements RepositoryInterface
+{
+    protected $model;
+
+    public function __construct(Model $model)
+    {
+        $this->model = $model;
+    }
+
+    public function index()
+    {
+        return $this->model->paginate(20);
+    }
+
+    public function store(array $data)
+    {
+        return $this->model->create($data);
+    }
+
+    public function show(int $id)
+    {
+        return $this->model->findOrFail($id);
+    }
+
+    public function update(int $id, array $data)
+    {
+        $model = $this->model->findOrFail($id);
+        $model->update($data);
+        return $model;
+    }
+
+    public function destroy(int $id)
+    {
+        $model = $this->model->findOrFail($id);
+        $model->delete();
+        return true;
+    }
+}
