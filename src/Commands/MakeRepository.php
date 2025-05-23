@@ -341,159 +341,73 @@ PHP;
     {
         $routePath = base_path('routes/api.php');
         $controllerClass = "App\\Http\\Controllers\\{$modelName}Controller";
-        $routeTableName = $modelName === 'HR' ? 'h_r_s' : $tableName;
+        $routeTableName = Str::snake(Str::plural($modelName));
         $routeCode = "    Route::resource('{$routeTableName}', {$modelName}Controller::class);";
-        $useRouteStatement = "use Illuminate\Support\Facades\Route;";
+        $useRouteStatement = "use Illuminate\\Support\\Facades\\Route;";
         $useControllerStatement = "use {$controllerClass};";
 
         if (!is_writable($routePath)) {
-            $this->error("Cannot write to {$routePath}. Please manually add the following to routes/api.php:");
+            $this->error("Cannot write to {$routePath}. Please manually add the route:");
             $this->line($useRouteStatement);
             $this->line($useControllerStatement);
             $this->line("Route::group(['middleware' => ['auth:api']], function () {");
-            $this->line("    Route::resource('{$routeTableName}', {$modelName}Controller::class);");
+            $this->line($routeCode);
             $this->line("});");
             return;
         }
 
         try {
-            // If file doesn't exist, create a new one with the desired format
+            // إنشاء الملف إذا لم يكن موجوداً
             if (!file_exists($routePath)) {
                 $content = <<<PHP
 <?php
 
-$useRouteStatement
-
-$useControllerStatement
+{$useRouteStatement}
+{$useControllerStatement}
 
 Route::group(['middleware' => ['auth:api']], function () {
-    Route::resource('{$routeTableName}', {$modelName}Controller::class);
+{$routeCode}
 });
 PHP;
                 $this->files->put($routePath, $content);
-                $this->info("Created routes/api.php with Route::resource for {$routeTableName} inside auth:api group");
+                $this->info("Created routes/api.php with auth:api group");
                 return;
             }
 
-            // Read existing file
             $content = file_get_contents($routePath);
-            $content = trim($content);
 
-            // Split content into lines
-            $lines = explode("\n", $content);
-            $useStatements = [];
-            $routeStatements = [];
-            $hasRouteUse = false;
-            $hasControllerUse = false;
-            $phpTag = '<?php';
-            $inAuthGroup = false;
-            $authGroupLines = [];
-            $nonGroupLines = [];
-
-            // Parse lines
-            foreach ($lines as $line) {
-                $trimmedLine = trim($line);
-
-                if ($trimmedLine === '<?php') {
-                    $phpTag = $trimmedLine;
-                    continue;
-                }
-
-                if (empty($trimmedLine)) {
-                    if ($inAuthGroup) {
-                        $authGroupLines[] = $line;
-                    } else {
-                        $nonGroupLines[] = $line;
-                    }
-                    continue;
-                }
-
-                if (preg_match('/^use\s+.*;/', $trimmedLine)) {
-                    if ($trimmedLine === $useRouteStatement) {
-                        $hasRouteUse = true;
-                    } elseif ($trimmedLine === $useControllerStatement) {
-                        $hasControllerUse = true;
-                    } else {
-                        $useStatements[] = $trimmedLine;
-                    }
-                    continue;
-                }
-
-                if (preg_match("/^Route::group\(\['middleware' => \['auth:api'\]\], function \(\) {/", $trimmedLine)) {
-                    $inAuthGroup = true;
-                    $authGroupLines[] = $line;
-                    continue;
-                }
-
-                if ($inAuthGroup && preg_match('/^\});/', $trimmedLine)) {
-                    $inAuthGroup = false;
-                    $authGroupLines[] = $line;
-                    continue;
-                }
-
-                if ($inAuthGroup) {
-                    $authGroupLines[] = $line;
-                } else {
-                    $nonGroupLines[] = $line;
-                }
-            }
-
-            // Check if the route already exists
-            $routeExists = false;
-            foreach ($authGroupLines as $line) {
-                if (Str::contains($line, "Route::resource('{$routeTableName}', {$modelName}Controller::class)")) {
-                    $routeExists = true;
-                    break;
-                }
-            }
-
-            if ($routeExists) {
-                $this->warn("Route::resource for {$routeTableName} already exists in routes/api.php");
+            // التحقق مما إذا كانت الروت موجودة بالفعل
+            if (Str::contains($content, "Route::resource('{$routeTableName}', {$modelName}Controller::class)")) {
+                $this->warn("Route for {$routeTableName} already exists in routes/api.php");
                 return;
             }
 
-            // Build new content
-            $newContent = [$phpTag, ""];
-
-            // Add use statements
-            if (!$hasRouteUse) {
-                $newContent[] = $useRouteStatement;
-            }
-            if (!$hasControllerUse) {
-                $newContent[] = $useControllerStatement;
-            }
-            foreach ($useStatements as $use) {
-                if ($use !== $useRouteStatement && $use !== $useControllerStatement) {
-                    $newContent[] = $use;
-                }
+            // إضافة use statements إذا لم تكن موجودة
+            if (!Str::contains($content, $useRouteStatement)) {
+                $content = str_replace('<?php', "<?php\n\n{$useRouteStatement}", $content);
             }
 
-            // Add blank line before routes
-            $newContent[] = "";
+            if (!Str::contains($content, $useControllerStatement)) {
+                $content = preg_replace('/<\?php\s+/', "<?php\n{$useControllerStatement}\n", $content);
+            }
 
-            // If there's an auth:api group, add the new route inside it
-            if (!empty($authGroupLines)) {
-                $lastLine = array_pop($authGroupLines); // Remove the closing });
-                $authGroupLines[] = $routeCode; // Add the new route
-                $authGroupLines[] = $lastLine; // Add back the closing });
-                $newContent = array_merge($newContent, $authGroupLines, $nonGroupLines);
-                $this->info("Added Route::resource for {$routeTableName} inside existing auth:api group in routes/api.php");
+            // إضافة الروت داخل مجموعة auth:api
+            if (Str::contains($content, "Route::group(['middleware' => ['auth:api']]")) {
+                // إذا كانت المجموعة موجودة، أضف الروت قبل الـ });
+                $content = preg_replace(
+                    '/(Route::group\(\[\'middleware\' => \[\'auth:api\'\]\], function \(\) \{\n)(.*?)(\n\s*\}\);)/s',
+                    "$1$2{$routeCode}\n$3",
+                    $content
+                );
             } else {
-                // If no auth:api group, create a new one
-                $newContent = array_merge($newContent, $nonGroupLines);
-                $newContent[] = "";
-                $newContent[] = "Route::group(['middleware' => ['auth:api']], function () {";
-                $newContent[] = $routeCode;
-                $newContent[] = "});";
-                $this->info("Created new auth:api group with Route::resource for {$routeTableName} in routes/api.php");
+                // إذا لم تكن المجموعة موجودة، أنشئها
+                $content .= "\n\nRoute::group(['middleware' => ['auth:api']], function () {\n{$routeCode}\n});";
             }
 
-            // Write new content
-            $this->files->put($routePath, implode("\n", $newContent) . "\n");
+            $this->files->put($routePath, $content);
+            $this->info("Added {$modelName} resource route to auth:api group in routes/api.php");
         } catch (\Exception $e) {
-            Log::error("Failed to update routes/api.php: {$e->getMessage()}");
-            $this->error("Failed to update routes/api.php: {$e->getMessage()}");
-            return;
+            $this->error("Failed to update routes: " . $e->getMessage());
         }
     }
 }
