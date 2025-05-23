@@ -34,6 +34,6 @@ php artisan make:repo {name : The name of the repository} --all (Includes: Model
 
 ## Service Provider:
 
-- $this->app->when(ProductService::class)
+$this->app->when(ProductService::class)
     ->needs(RepositoryInterface::class)
     ->give(ProductRepository::class);
