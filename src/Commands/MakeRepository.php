@@ -342,11 +342,7 @@ PHP;
         $routePath = base_path('routes/api.php');
         $controllerClass = "App\\Http\\Controllers\\{$modelName}Controller";
         $routeTableName = $modelName === 'HR' ? 'h_r_s' : $tableName;
-        $routeCode = <<<PHP
-Route::group(['middleware' => ['auth:api']], function () {
-    Route::resource('{$routeTableName}', {$modelName}Controller::class);
-});
-PHP;
+        $routeCode = "    Route::resource('{$routeTableName}', {$modelName}Controller::class);";
         $useRouteStatement = "use Illuminate\Support\Facades\Route;";
         $useControllerStatement = "use {$controllerClass};";
 
@@ -354,7 +350,9 @@ PHP;
             $this->error("Cannot write to {$routePath}. Please manually add the following to routes/api.php:");
             $this->line($useRouteStatement);
             $this->line($useControllerStatement);
-            $this->line($routeCode);
+            $this->line("Route::group(['middleware' => ['auth:api']], function () {");
+            $this->line("    Route::resource('{$routeTableName}', {$modelName}Controller::class);");
+            $this->line("});");
             return;
         }
 
@@ -368,7 +366,9 @@ $useRouteStatement
 
 $useControllerStatement
 
-$routeCode
+Route::group(['middleware' => ['auth:api']], function () {
+    Route::resource('{$routeTableName}', {$modelName}Controller::class);
+});
 PHP;
                 $this->files->put($routePath, $content);
                 $this->info("Created routes/api.php with Route::resource for {$routeTableName} inside auth:api group");
@@ -386,7 +386,9 @@ PHP;
             $hasRouteUse = false;
             $hasControllerUse = false;
             $phpTag = '<?php';
-            $currentBlock = [];
+            $inAuthGroup = false;
+            $authGroupLines = [];
+            $nonGroupLines = [];
 
             // Parse lines
             foreach ($lines as $line) {
@@ -398,9 +400,10 @@ PHP;
                 }
 
                 if (empty($trimmedLine)) {
-                    if (!empty($currentBlock)) {
-                        $routeStatements[] = implode("\n", $currentBlock);
-                        $currentBlock = [];
+                    if ($inAuthGroup) {
+                        $authGroupLines[] = $line;
+                    } else {
+                        $nonGroupLines[] = $line;
                     }
                     continue;
                 }
@@ -413,22 +416,40 @@ PHP;
                     } else {
                         $useStatements[] = $trimmedLine;
                     }
-                    if (!empty($currentBlock)) {
-                        $routeStatements[] = implode("\n", $currentBlock);
-                        $currentBlock = [];
-                    }
-                } elseif (preg_match('/^Route::/', $trimmedLine)) {
-                    $currentBlock[] = $line;
+                    continue;
+                }
+
+                if (preg_match("/^Route::group\(\['middleware' => \['auth:api'\]\], function \(\) {/", $trimmedLine)) {
+                    $inAuthGroup = true;
+                    $authGroupLines[] = $line;
+                    continue;
+                }
+
+                if ($inAuthGroup && preg_match('/^\});/', $trimmedLine)) {
+                    $inAuthGroup = false;
+                    $authGroupLines[] = $line;
+                    continue;
+                }
+
+                if ($inAuthGroup) {
+                    $authGroupLines[] = $line;
                 } else {
-                    if (!empty($currentBlock)) {
-                        $currentBlock[] = $line;
-                    }
+                    $nonGroupLines[] = $line;
                 }
             }
 
-            // Add any remaining block
-            if (!empty($currentBlock)) {
-                $routeStatements[] = implode("\n", $currentBlock);
+            // Check if the route already exists
+            $routeExists = false;
+            foreach ($authGroupLines as $line) {
+                if (Str::contains($line, "Route::resource('{$routeTableName}', {$modelName}Controller::class)")) {
+                    $routeExists = true;
+                    break;
+                }
+            }
+
+            if ($routeExists) {
+                $this->warn("Route::resource for {$routeTableName} already exists in routes/api.php");
+                return;
             }
 
             // Build new content
@@ -450,27 +471,21 @@ PHP;
             // Add blank line before routes
             $newContent[] = "";
 
-            // Add existing route statements
-            foreach ($routeStatements as $route) {
-                if (!empty(trim($route))) {
-                    $newContent[] = $route;
-                }
-            }
-
-            // Add new route if not present
-            $routeExists = false;
-            foreach ($routeStatements as $route) {
-                if (Str::contains($route, "Route::resource('{$routeTableName}', {$modelName}Controller::class)")) {
-                    $routeExists = true;
-                    break;
-                }
-            }
-
-            if (!$routeExists) {
-                $newContent[] = $routeCode;
-                $this->info("Added Route::resource for {$routeTableName} inside auth:api group to routes/api.php");
+            // If there's an auth:api group, add the new route inside it
+            if (!empty($authGroupLines)) {
+                $lastLine = array_pop($authGroupLines); // Remove the closing });
+                $authGroupLines[] = $routeCode; // Add the new route
+                $authGroupLines[] = $lastLine; // Add back the closing });
+                $newContent = array_merge($newContent, $authGroupLines, $nonGroupLines);
+                $this->info("Added Route::resource for {$routeTableName} inside existing auth:api group in routes/api.php");
             } else {
-                $this->warn("Route::resource for {$routeTableName} already exists in routes/api.php");
+                // If no auth:api group, create a new one
+                $newContent = array_merge($newContent, $nonGroupLines);
+                $newContent[] = "";
+                $newContent[] = "Route::group(['middleware' => ['auth:api']], function () {";
+                $newContent[] = $routeCode;
+                $newContent[] = "});";
+                $this->info("Created new auth:api group with Route::resource for {$routeTableName} in routes/api.php");
             }
 
             // Write new content
