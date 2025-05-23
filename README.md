@@ -1,25 +1,39 @@
-# Laravel Repository Pattern Package
+# Laravel Repository Pattern Generator
 
-A Laravel package that simplifies the implementation of the **Repository Pattern** along with **Service Classes**, **Resources**, **Controllers**, and more using simple Artisan commands.
+A powerful package to automatically generate the complete repository pattern structure for your Laravel applications.
 
-## 📦 What does this package do?
+## Features
 
-This package helps you to:
+- 🚀 Auto-generates all repository pattern components with one command
+- 📦 Includes: Model, Repository, Service, Controller, Form Requests, Migration
+- 🔄 Supports both API and web routes
+- ⚡ Easily extendable base classes
+- 🔧 Customizable stubs
 
-- Implement the **Repository Pattern** in a clean and structured way.
-- Generate all essential files with one command:
-  - Model
-  - Repository
-  - Service
-  - Controller
-  - Form Requests
-  - Migration
-  - API Resource
-  - Collection
+## Installation
 
-## 🚀 Installation
+1. Require the package via Composer:
 
 ```bash
 composer require ahmedmahmoud/repository-pattern
+```
+2.(Optional) Publish stubs for customization:
+```bash
+php artisan vendor:publish --tag=repository-stubs --force
+```
+3. Run the setup command to install base files:
 
+```bash
+php artisan repository:setup
+```
+4. Generate complete structure for a new model:
 
+```bash
+php artisan make:repo {name : The name of the repository} --all (Includes: Model, Repository, Service, Controller, Form Requests, Migration}
+```
+
+## Service Provider:
+
+- $this->app->when(ProductService::class)
+    ->needs(RepositoryInterface::class)
+    ->give(ProductRepository::class);
