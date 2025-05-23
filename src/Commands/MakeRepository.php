@@ -371,17 +371,22 @@ PHP;
                 $content .= "\n\nRoute::group(['middleware' => ['auth:api']], function () {\n});\n";
             }
 
+            // استخدم regex يسمح بوجود أي فراغات أو سطور جديدة داخل الجروب
             $content = preg_replace_callback(
-                '/(Route::group\(\[\'middleware\' => \[\'auth:api\'\]\], function \(\) \{\n)(.*?)(\n\s*\}\);)/s',
+                '/(Route::group\(\[\'middleware\' => \[\'auth:api\'\]\], function \(\) \{\s*)(.*?)(\s*\}\);)/s',
                 function ($matches) use ($routeCode) {
-                    $existingRoutes = array_filter(explode("\n", trim($matches[2])));
-                    if (in_array(trim($routeCode), array_map('trim', $existingRoutes))) {
-                        return $matches[0];
+                    $existingRoutes = array_filter(array_map('trim', explode("\n", trim($matches[2]))));
+
+                    if (in_array(trim($routeCode), $existingRoutes)) {
+                        return $matches[0]; // الراوت موجود بالفعل
                     }
 
-                    $existingRoutes[] = $routeCode;
+                    $existingRoutes[] = trim($routeCode);
                     sort($existingRoutes);
-                    $newRoutes = implode("\n", $existingRoutes) . "\n";
+
+                    $newRoutes = implode("\n", array_map(function ($line) {
+                        return "    " . $line;
+                    }, $existingRoutes)) . "\n";
 
                     return $matches[1] . $newRoutes . $matches[3];
                 },
