@@ -26,6 +26,7 @@ class MakeRepository extends GeneratorCommand
     protected $type = 'Repository';
 
     protected $filesGenerated = false; // Track if any files were generated
+    protected $allFilesGenerated = true; // Track if all required files were generated
 
     protected function getStub()
     {
@@ -69,7 +70,11 @@ class MakeRepository extends GeneratorCommand
         }
 
         if ($this->filesGenerated) {
-            $this->info("Repository pattern files for {$modelName} created successfully!");
+            if ($this->option('all') && $this->allFilesGenerated) {
+                $this->info("All repository pattern files for {$modelName} have been successfully generated!");
+            } else {
+                $this->info("Repository pattern files for {$modelName} created successfully!");
+            }
         } else {
             $this->info("No new files were created for {$modelName} as all files and migration already exist.");
         }
@@ -123,26 +128,41 @@ class MakeRepository extends GeneratorCommand
             'collection' => app_path("Http/Resources/{$modelName}Collection.php"),
         ];
 
+        $migrationGenerated = true; // Track migration separately
         // Check for existing migration files
         $migrationPath = database_path('migrations');
         $existingMigrations = glob($migrationPath . '/*_create_' . $tableName . '_table.php');
         if (count($existingMigrations) > 0) {
             $this->warn("Migration for {$tableName} table skipped because a migration file already exists: " . basename($existingMigrations[0]));
+            $migrationGenerated = false;
         } elseif (Schema::hasTable($tableName)) {
             $this->warn("Migration for {$tableName} table skipped because the table already exists in the database.");
+            $migrationGenerated = false;
         } else {
             $files['migration'] = database_path("migrations/" . date('Y_m_d_His') . "_create_{$tableName}_table.php");
-            $this->info("Created migration file for {$tableName} table.");
         }
 
+        $replacements = [
+            '{{ModelName}}' => $modelName,
+            '{{modelName}}' => $lowerName,
+            '{{tableName}}' => $tableName,
+            '{{tableName|studly}}' => Str::studly($tableName),
+        ];
+
         foreach ($files as $stub => $path) {
-            $replacements = [
-                '{{ModelName}}' => $modelName,
-                '{{modelName}}' => $lowerName,
-                '{{tableName}}' => $tableName,
-                '{{tableName|studly}}' => Str::studly($tableName),
-            ];
-            $this->generateFile($stub, $path, $replacements);
+            if (!$this->generateFile($stub, $path, $replacements)) {
+                // If any file (except migration) fails to generate, mark allFilesGenerated as false
+                if ($stub !== 'migration') {
+                    $this->allFilesGenerated = false;
+                }
+            } else {
+                $this->info("Generated {$stub} file: {$path}");
+            }
+        }
+
+        // If migration was skipped but all other files were generated, consider it a success
+        if (!$migrationGenerated && $this->allFilesGenerated) {
+            $this->allFilesGenerated = true;
         }
 
         $this->registerBinding($modelName);
@@ -162,33 +182,40 @@ class MakeRepository extends GeneratorCommand
         if ($this->option('model')) {
             if ($this->generateFile('model', app_path("Models/{$modelName}.php"), $replacements)) {
                 $generated = true;
+                $this->info("Generated model file: " . app_path("Models/{$modelName}.php"));
             }
         }
 
         if ($this->option('repository')) {
             if ($this->generateFile('repository', app_path("Repositories/{$modelName}Repository.php"), $replacements)) {
                 $generated = true;
+                $this->info("Generated repository file: " . app_path("Repositories/{$modelName}Repository.php"));
             }
         }
 
         if ($this->option('service') || $this->option('controller')) {
             if ($this->generateFile('repository', app_path("Repositories/{$modelName}Repository.php"), $replacements)) {
                 $generated = true;
+                $this->info("Generated repository file: " . app_path("Repositories/{$modelName}Repository.php"));
             }
             if ($this->generateFile('service', app_path("Services/{$modelName}Service.php"), $replacements)) {
                 $generated = true;
+                $this->info("Generated service file: " . app_path("Services/{$modelName}Service.php"));
             }
         }
 
         if ($this->option('controller')) {
             if ($this->generateFile('resource', app_path("Http/Resources/{$modelName}Resource.php"), $replacements)) {
                 $generated = true;
+                $this->info("Generated resource file: " . app_path("Http/Resources/{$modelName}Resource.php"));
             }
             if ($this->generateFile('collection', app_path("Http/Resources/{$modelName}Collection.php"), $replacements)) {
                 $generated = true;
+                $this->info("Generated collection file: " . app_path("Http/Resources/{$modelName}Collection.php"));
             }
             if ($this->generateFile('controller', app_path("Http/Controllers/{$modelName}Controller.php"), $replacements)) {
                 $generated = true;
+                $this->info("Generated controller file: " . app_path("Http/Controllers/{$modelName}Controller.php"));
             }
             $this->addRouteResource($modelName, $tableName);
         }
@@ -202,7 +229,7 @@ class MakeRepository extends GeneratorCommand
                 $this->warn("Migration for {$tableName} table skipped because the table already exists in the database.");
             } else {
                 if ($this->generateFile('migration', database_path("migrations/" . date('Y_m_d_His') . "_create_{$tableName}_table.php"), $replacements)) {
-                    $this->info("Created migration file for {$tableName} table.");
+                    $this->info("Generated migration file for {$tableName} table.");
                     $generated = true;
                 }
             }
@@ -246,7 +273,7 @@ class MakeRepository extends GeneratorCommand
         }
 
         $this->files->put($path, $content);
-        $this->filesGenerated = true; // Mark that a file was generated
+        $this->filesGenerated = true;
         return true;
     }
 
@@ -314,7 +341,8 @@ PHP;
     {
         $routePath = base_path('routes/api.php');
         $controllerClass = "App\\Http\\Controllers\\{$modelName}Controller";
-        $routeCode = "\nRoute::resource('{$tableName}', {$modelName}Controller::class);";
+        $routeTableName = $modelName === 'HR' ? 'h_r_s' : $tableName;
+        $routeCode = "\nRoute::resource('{$routeTableName}', {$modelName}Controller::class);";
         $useRouteStatement = "use Illuminate\Support\Facades\Route;";
         $useControllerStatement = "use {$controllerClass};";
 
@@ -327,21 +355,17 @@ PHP;
         }
 
         try {
-            // Initialize content if file doesn't exist
             $content = file_exists($routePath) ? file_get_contents($routePath) : "<?php\n\n$useRouteStatement;\n";
-
             $content = preg_replace('/<\?php\s*/', '<?php', $content);
             $content = preg_replace('/\?>\s*$/', '', $content);
             $content = trim($content) . "\n";
 
-            // Split content into lines for easier manipulation
             $lines = explode("\n", $content);
             $useStatements = [];
             $routeStatements = [];
             $hasRouteUse = false;
             $hasControllerUse = false;
 
-            // Parse lines to separate use statements and routes
             foreach ($lines as $line) {
                 if (trim($line) === '<?php' || empty(trim($line))) {
                     continue;
@@ -359,39 +383,25 @@ PHP;
                 }
             }
 
-            // Build new content
             $newContent = ["<?php", ""];
-
-            // Always add Route use statement first
             $newContent[] = $useRouteStatement . ";";
-
-            // Add controller use statement if not present
             if (!$hasControllerUse) {
                 $newContent[] = $useControllerStatement . ";";
             }
-
-            // Add other use statements
             foreach ($useStatements as $use) {
                 $newContent[] = $use;
             }
-
-            // Add blank line before routes
             $newContent[] = "";
-
-            // Add existing route statements
             foreach ($routeStatements as $route) {
                 $newContent[] = $route;
             }
-
-            // Add new route if not present
             if (!in_array(trim($routeCode), array_map('trim', $routeStatements))) {
                 $newContent[] = trim($routeCode);
-                $this->info("Added Route::resource for {$tableName} to routes/api.php");
+                $this->info("Added Route::resource for {$routeTableName} to routes/api.php");
             } else {
-                $this->warn("Route::resource for {$tableName} already exists in routes/api.php");
+                $this->warn("Route::resource for {$routeTableName} already exists in routes/api.php");
             }
 
-            // Write new content
             $this->files->put($routePath, implode("\n", $newContent) . "\n");
         } catch (\Exception $e) {
             Log::error("Failed to update routes/api.php: {$e->getMessage()}");
@@ -400,3 +410,7 @@ PHP;
         }
     }
 }
+// End of MakeRepository.php
+// This file is part of the Ahmed Mahmoud Repository Pattern package.
+// It is licensed under the MIT License.
+// For more information, please refer to the LICENSE file in the root directory of this package.

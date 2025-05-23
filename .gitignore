@@ -6,4 +6,5 @@
 .env
 .DS_Store
 *.log
+README.md
 composer.lock
