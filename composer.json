@@ -15,7 +15,7 @@
             "url": "https://github.com/Ahmed1230000/repositories-pattern.git"
         }
     ],
-    "minimum-stability": "dev",
+    "minimum-stability": "stable",
     "prefer-stable": true,
     "require": {
         "php": "^8.1",
