@@ -6,7 +6,7 @@ A powerful package to automatically generate the complete repository pattern str
 
 - 🚀 Auto-generates all repository pattern components with one command
 - 📦 Includes: Model, Repository, Service, Controller, Form Requests, Migration
-- 🔄 Supports both API and web routes
+- 🔄 Supports both API
 - ⚡ Easily extendable base classes
 - 🔧 Customizable stubs
 
